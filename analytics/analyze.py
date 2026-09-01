@@ -161,3 +161,17 @@ def find_suspicious_activity(lst):
     return users
 
 
+def analysis():
+    return (get_total_requests(new_logs),
+    get_total_user_requests(new_logs),
+    most_active_user(new_logs),
+    get_unique_user_request(new_logs),
+    get_most_accessed_point(new_logs),
+    get_unique_endpoints(new_logs),
+    analyze_severity(new_logs),
+    calc_error_percent(total, errors),
+    most_error_user(new_logs),
+    filter_users(new_logs),
+    most_error_endpoint(new_logs),
+    group_severity(new_logs),
+    find_suspicious_activity(new_logs))
