@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from reports.report import generate_report
 import time
 from datetime import datetime
@@ -12,7 +12,7 @@ async def request_logger(request:Request, call_next):
     start = time.time()
     response = await call_next(request)
     end = time.time()
-    response_time = (end - start) * 1000
+    response_time = round((end - start) * 1000,2)
 
     if response.status_code >=400:
         level = "ERROR"
@@ -44,13 +44,39 @@ def report():
     return generate_report()
 
 @app.get("/login")
-def login(user_id):
-    return {"login working perf"}
+def login(user_id, success:bool = True):
+    if success:
+        return {"message":"login successful"}
+    else:
+        raise HTTPException(
+            status_code=401,
+            detail="login failed"
+        )
+
+@app.get("/search")
+def search(user_id):
+    time.sleep(2)
+    return {"message": "search completed"}
 
 @app.get("/products")
 def products(user_id):
-    return {"products working good"}
+    return {"message":"products working"}
 
+@app.get("/checkout")
+def checkout(user_id, success:bool=True):
+    if success:
+        return {"message":"checkout successful"}
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail="checkout service failed"
+        )
 @app.get("/payment")
-def payemnts(user_id):
-    return {"payment working okay"}
+def payment(user_id, success: bool=True):
+    if success:
+        return {"message":"payment successful"}
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail="payment service failed"
+        )

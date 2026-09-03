@@ -1,5 +1,3 @@
-from logs import logs
-
 def parse_logs(raw_logs):
     final_logs = []
     for log in raw_logs:

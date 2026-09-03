@@ -1,6 +1,10 @@
-from analytics.analyze import new_logs, get_total_requests,get_total_user_requests, get_unique_user_request, most_active_user, get_most_accessed_point, get_unique_endpoints, analyze_severity, calc_error_percent, filtered_users, find_suspicious_activity, most_error_endpoint, most_error_user
+from analytics.ingest import ingest_data
+
+from analytics.analyze import get_total_requests,get_total_user_requests, get_unique_user_request, most_active_user, get_most_accessed_point, get_unique_endpoints, analyze_severity, calc_error_percent, find_suspicious_activity, most_error_endpoint, most_error_user, slow_request, slow_endpoints
+
 
 def generate_report():
+    new_logs = ingest_data()
     total_requests = get_total_requests(new_logs)
     user_requests = get_total_user_requests(new_logs)
 
@@ -11,55 +15,42 @@ def generate_report():
     unique_endpoints = get_unique_endpoints(new_logs)
 
     severity_counts = analyze_severity(new_logs)
-    error_count = severity_counts['ERROR']
-    error_percent = calc_error_percent(total_requests, error_count)
+    error_count = severity_counts.get('ERROR',0)
+    error_percent = round(calc_error_percent(total_requests, error_count),2)
 
-    error_users = list(filtered_users)
+    error_users = list(most_error_user(new_logs).items())
     suspicious_users = find_suspicious_activity(new_logs)
 
-    # print("=" * 40)
-    # print("        SERVER LOG ANALYSIS")
-    # print("=" * 40)
-    #
-    # print(f"\nTotal requests       : {total_requests}")
-    # print(f"Unique users         : {len(unique_users)}")
-    # print(f"Unique endpoints     : {len(unique_endpoints)}")
-    #
-    # print("\n--------- SEVERITY ---------")
-    # print(f"INFO                 : {severity_counts['INFO']}")
-    # print(f"WARNING              : {severity_counts['WARNING']}")
-    # print(f"ERROR                : {severity_counts['ERROR']}")
-    # print(f"Error percentage     : {error_percent}")
-    #
-    # print("\n--------- USERS ---------")
-    # print(f"Most active user     : {active_user}")
-    # print(f"Requests             : {active_count}")
-    #
-    # print("\nUsers with >3 errors:")
-    # for user, count in error_users:
-    #     print(f"- {user} ({count} errors)")
-    #
-    # print("\n--------- ENDPOINTS ---------")
-    # print(f"Most accessed        : {most_accessed}")
-    # print(f"Unique endpoints     : {len(unique_endpoints)}")
-    # print(f"Most error-prone     : {most_error_endpoint(new_logs)}")
-    #
-    # print("\n--------- SUSPICIOUS ---------")
-    # for user, details in suspicious_users.items():
-    #     print(f"\n{user}")
-    #     if 'err_percent' in details:
-    #         print(f"- Error rate: {details['err_percent']}%")
-    #     print("Reasons:")
-    #     for reason in details['reason']:
-    #         print(f"- {reason}")
-    #
-    # print("\n" + "=" * 40)
+    slow_requests = slow_request(new_logs)
+    slow_eps, slowest_request, highest_time = slow_endpoints(new_logs)
 
-    return ({"total_requests":total_requests,
-            "unique_users":len(unique_users),
-            "unique_endpoints":len(unique_endpoints),
-            "severity":{"info":severity_counts['INFO'],"warning":severity_counts['WARNING'],"error":severity_counts['ERROR'],"error_percentage":error_percent},
-            "users":{"most_active_user":active_user, "requests":active_count},
-            "endpoints":{"most_accessed":most_accessed,"unique_endpoints":len(unique_endpoints),"most_error_prone":most_error_endpoint(new_logs)},
-            "suspicious_users":suspicious_users})
+    return {
+        "request_analytics": {
+            "total_requests": total_requests,
+            "most_accessed_endpoint": most_accessed,
+            "unique_endpoints":len(unique_endpoints)
+        },
+
+        "user_analytics": {
+            "unique_users": len(unique_users),
+            "most_active_user": active_user,
+            "most_active_user_requests": active_count,
+            "suspicious_users": suspicious_users
+        },
+
+        "error_analytics": {
+            "info": severity_counts.get("INFO", 0),
+            "warning": severity_counts.get("WARNING", 0),
+            "error": severity_counts.get("ERROR", 0),
+            "error_percentage": f"{error_percent}%",
+            "most_error_user": error_users,
+            "most_error_prone_endpoint": most_error_endpoint(new_logs)
+        },
+
+        "performance_analytics": {
+            "total_slow_requests": len(slow_requests),
+            "slow_endpoints": slow_eps,
+            "slowest_request": {"endpoint":slowest_request.get('endpoint'), "response_time":slowest_request.get('response_time')}
+        }
+    }
 

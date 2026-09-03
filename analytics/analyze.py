@@ -1,28 +1,19 @@
-from logs import logs
-from analytics.parse import parse_logs
-
-new_logs = parse_logs(logs)
-
+import time
+from fastapi import Request
+from datetime import datetime
 def get_total_requests(lst):
-    # count_req = 0
-    # for i in lst:
-    #     count_req+=1
-    # return count_req
     return len(lst)
-
-total = get_total_requests(new_logs)
 
 def get_total_user_requests(lst):
     total_user_req = {}
     for log in lst:
-        user = log['user']
-        if user in total_user_req:
-            total_user_req[user]+=1
-        else:
-            total_user_req[user] = 1
+        user = log['user_id']
+        if user is not None:
+            if user in total_user_req:
+                total_user_req[user]+=1
+            else:
+                total_user_req[user] = 1
     return total_user_req
-
-total_user_reqs = get_total_user_requests(new_logs)
 
 def most_active_user(dct):
     count = 0
@@ -34,15 +25,11 @@ def most_active_user(dct):
     return user, count
 
 def get_unique_user_request(lst):
-    unique_user_req = {}
     unique_users = set()
     for log in lst:
-        user = log['user']
-        unique_users.add(user)
-        if user in unique_user_req:
-            unique_user_req[user]+=1
-        else:
-            unique_user_req[user] = 1
+        user = log['user_id']
+        if user is not None:
+            unique_users.add(user)
     return unique_users
 
 def get_most_accessed_point(lst):
@@ -62,15 +49,9 @@ def get_most_accessed_point(lst):
     return most_accessed_point
 
 def get_unique_endpoints(lst):
-    unique_ep = {}
     endpoints = set()
     for log in lst:
-        ep = log['endpoint']
-        endpoints.add(ep)
-        if ep in unique_ep:
-            unique_ep[ep] += 1
-        else:
-            unique_ep[ep] = 1
+        endpoints.add(log['endpoint'])
     return endpoints
 
 # get_ep = [i['endpoint'] for i in new_logs]
@@ -79,26 +60,26 @@ def get_unique_endpoints(lst):
 def analyze_severity(lst):
     severity_count = {}
     for log in lst:
-        sc = log['severity']
-        if sc in severity_count:
-            severity_count[sc]+=1
+        level = log['level']
+        if level in severity_count:
+            severity_count[level]+=1
         else:
-            severity_count[sc] = 1
+            severity_count[level] = 1
     return severity_count
 
-severity = analyze_severity(new_logs)
-errors = severity['ERROR']
-
 def calc_error_percent(total_req, error_count):
+    if total_req == 0:
+        return 0
+
     error_percentage = (error_count/total_req)*100
-    return f'{int(error_percentage)}%'
+    return error_percentage
 
 def most_error_user(lst):
     error_users = {}
     for log in lst:
-        error_sev = log['severity']
-        error_user = log['user']
-        if error_sev == 'ERROR':
+        error_level = log['level']
+        error_user = log['user_id']
+        if error_level == 'ERROR' and error_user is not None:
             if error_user in error_users:
                 error_users[error_user]+=1
             else:
@@ -111,15 +92,13 @@ def filter_users(tup):
         return True
     return False
 
-filtered_users = filter(filter_users,most_error_user(new_logs).items())
-
 def group_severity(lst):
     groups = {}
     for log in lst:
-        type_severity = log['severity']
-        if type_severity not in groups:
-            groups[type_severity] = []
-        groups[type_severity].append(log)
+        level = log['level']
+        if level not in groups:
+            groups[level] = []
+        groups[level].append(log)
     return groups
 
 def most_error_endpoint(lst):
@@ -127,9 +106,9 @@ def most_error_endpoint(lst):
     most_error_ep = None
     highest_count = 0
     for log in lst:
-        error_sev = log['severity']
+        error_level = log['level']
         error_ep = log['endpoint']
-        if error_sev == 'ERROR':
+        if error_level == 'ERROR':
             if error_ep in endpoint_error:
                 endpoint_error[error_ep]+=1
             else:
@@ -142,36 +121,40 @@ def most_error_endpoint(lst):
 
 def find_suspicious_activity(lst):
     users = {}
-    err_counts = most_error_user(new_logs)
-    for log in lst:
-        user = log['user']
+    err_counts = most_error_user(lst)
+    total_user_reqs = get_total_user_requests(lst)
+    for user, user_err in err_counts.items():
         user_req = total_user_reqs[user]
-        if user in err_counts:
-            user_err = err_counts[user]
-            err_percent = (user_err / user_req) * 100
-            if user not in users:
-                sus_user = {'reason': []}
-                if user_err > 3:
-                    sus_user['reason'].append('More than 3 errors')
-                    users[user] = sus_user
-                if err_percent > 50:
-                    sus_user['err_percent'] = err_percent
-                    sus_user['reason'].append('Error rate above 50%')
-                    users[user] = sus_user
+        err_percent = round((user_err / user_req) * 100,2)
+        sus_user = {'reason': []}
+        if user_err > 3:
+            sus_user['reason'].append('More than 3 errors')
+        if err_percent > 50:
+            sus_user['err_percent'] = err_percent
+            sus_user['reason'].append('Error rate above 50%')
+        if sus_user['reason']:
+            users[user] = sus_user
     return users
 
+def slow_request(lst):
+    slow_reqs = []
+    for log in lst:
+        if log['response_time'] > 1000:
+            slow_reqs.append(log)
+    return slow_reqs
 
-def analysis():
-    return (get_total_requests(new_logs),
-    get_total_user_requests(new_logs),
-    most_active_user(new_logs),
-    get_unique_user_request(new_logs),
-    get_most_accessed_point(new_logs),
-    get_unique_endpoints(new_logs),
-    analyze_severity(new_logs),
-    calc_error_percent(total, errors),
-    most_error_user(new_logs),
-    filter_users(new_logs),
-    most_error_endpoint(new_logs),
-    group_severity(new_logs),
-    find_suspicious_activity(new_logs))
+def slow_endpoints(lst):
+    slow_eps = {}
+    highest_time = 0
+    slowest_ep = None
+    for log in lst:
+        if log['response_time'] > 1000:
+            endpoint = log['endpoint']
+            if endpoint in slow_eps:
+                slow_eps[endpoint]+=1
+            else:
+                slow_eps[endpoint]=1
+            if log['response_time'] > highest_time:
+                highest_time = log['response_time']
+                slowest_ep = log
+    return slow_eps, slowest_ep, highest_time
