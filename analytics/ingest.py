@@ -59,5 +59,3 @@ def ingest_data():
             db.close()
 
     return final_logs
-
-ingest_data()

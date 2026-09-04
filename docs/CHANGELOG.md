@@ -82,3 +82,56 @@ sample routes; log real requests to `logs.jsonl`.
 - Sample routes (`/login`, `/products`, `/payment`) accept a `user_id`
   query param, enabling real multi-user traffic.
 
+---
+
+## Phase 4 — Log ingestion ✅
+
+**Goal:** Normalize raw logs into records and persist them.
+
+### Done
+- `analytics/ingest.py` reads `logs.jsonl`.
+- Requires `timestamp`, `level`, `user_id`, `method`, `endpoint`,
+  `status_code`, and `response_time`.
+- Skips blank lines and malformed JSON entries.
+- Normalizes `response_time` to two decimal places.
+- Deduplicates incoming entries before inserting `Log` rows.
+- Commits successful ingestion, rolls back on database errors, and closes
+  the session.
+
+---
+
+## Phase 5 — SQLite (SQLAlchemy) ✅
+
+**Goal:** Persist logs through SQLAlchemy.
+
+### Done
+- `db/session.py` provides the SQLite engine, declarative base, and
+  `SessionLocal`.
+- `db/models.py` defines the `logs` table with timestamp, level, user,
+  method, endpoint, status-code, and response-time fields.
+- `pyproject.toml` adds `sqlalchemy>=2.0.52`.
+- Ingestion writes records; analytics now reads from `data/analog.db`.
+
+---
+
+## Phase 6 — AnaLog analytics ✅
+
+**Goal:** Re-point analytics at SQLite while keeping V1 metrics.
+
+### Done
+- Converted `analytics/analyze.py` from in-memory list processing to
+  SQLAlchemy queries against `Log`.
+- Preserved request totals, per-user totals, active users, unique
+  users/endpoints, severity counts, error percentage, error-prone
+  users/endpoints, suspicious-user detection, and slow-request analysis.
+- Updated `reports/report.py` to run ingestion, open a managed database
+  session, compute request/user/error/performance sections from SQLite,
+  safely handle an absent slowest request, and close the session.
+- Traffic routes now include `/login`, `/search`, `/products`, `/checkout`,
+  and `/payment`, with `user_id`, success/failure switches, and a slow
+  search path for exercising real ERROR and slow-request data.
+- `main.py` now delegates to `generate_report()`.
+- The live JSONL/SQLite report path no longer calls
+  `analytics/parse.py`; that module remains for the legacy pipe-delimited
+  V1 format.
+
